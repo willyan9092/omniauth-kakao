@@ -10,12 +10,12 @@ describe OmniAuth::Strategies::Kakao do
     OmniAuth.config.logger.level = 5
   end
 
-  let(:middleware) do
+  def make_middleware(client_id, opts={})
     app = ->(env) { [200, env, "app"] }
 
-    middleware = OmniAuth::Strategies::Kakao.new(app)
+    middleware = OmniAuth::Strategies::Kakao.new(app, opts)
     middleware.tap do |middleware|
-      middleware.options.client_id = CLIENT_ID
+      middleware.options.client_id = client_id
     end
   end
 
@@ -29,6 +29,7 @@ describe OmniAuth::Strategies::Kakao do
   describe "GET /auth/kakao" do
     it "should redirect to authorize page" do
       request = make_request('/auth/kakao')
+      middleware = make_middleware(CLIENT_ID)
 
       code, env = middleware.call(request)
 
@@ -38,6 +39,27 @@ describe OmniAuth::Strategies::Kakao do
         https://kauth.kakao.com/oauth/authorize
           ?client_id=#{CLIENT_ID}
           &redirect_uri=http://#{SERVER_NAME}/oauth
+          &response_type=code
+        EXPECT
+        .gsub(/(\n|\t|\s)/, '')
+
+      actual_url = URI.decode(env['Location'].split("&state")[0])
+
+      actual_url.should == expect_url
+    end
+
+    it "should customize redirect path" do
+      request = make_request('/auth/kakao')
+      middleware = make_middleware(CLIENT_ID, redirect_path: '/auth/kakao/callback')
+
+      code, env = middleware.call(request)
+
+      code.should == 302
+
+      expect_url = <<-EXPECT
+        https://kauth.kakao.com/oauth/authorize
+          ?client_id=#{CLIENT_ID}
+          &redirect_uri=http://#{SERVER_NAME}/auth/kakao/callback
           &response_type=code
         EXPECT
         .gsub(/(\n|\t|\s)/, '')
@@ -93,6 +115,8 @@ describe OmniAuth::Strategies::Kakao do
         },
       })
 
+      middleware = make_middleware(CLIENT_ID)
+
       code, env = middleware.call(request)
 
       code.should == 200
@@ -114,6 +138,43 @@ describe OmniAuth::Strategies::Kakao do
       properties.nickname.should == "John Doe"
       properties.thumbnail_image.should == "http://xxx.kakao.com/.../aaa.jpg"
       properties.profile_image.should == "http://xxx.kakao.com/.../bbb.jpg"
+    end
+  end
+
+  context "test environment" do
+    before do
+      OmniAuth.config.test_mode = true
+      OmniAuth.config.add_mock(:kakao, {
+        provider: "kakao",
+        uid: "123456789",
+        info: {
+          name: "John Doe",
+          image: "http://xxx.kakao.com/.../aaa.jpg"
+        }
+      })
+    end
+
+    describe "GET /oauth" do
+      it "should request registered mock" do
+        request = make_request("/oauth")
+        middleware = make_middleware(CLIENT_ID)
+        code, env = middleware.call(request)
+
+        code.should == 200
+
+        response = env["omniauth.auth"]
+
+        response.provider.should == "kakao"
+        response.uid.should == "123456789"
+
+        information = response.info
+        information.name.should == "John Doe"
+        information.image.should == "http://xxx.kakao.com/.../aaa.jpg"
+      end
+    end
+
+    after do
+      OmniAuth.config.test_mode = false
     end
   end
 end
