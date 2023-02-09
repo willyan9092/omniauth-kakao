@@ -37,8 +37,8 @@ module OmniAuth
       end
 
       def image
-        return if raw_properties['profile_image'].nil?
-        return raw_properties['profile_image']
+        return if raw_properties['picture'].nil?
+        return raw_properties['picture']
       end
 
       def raw_info
