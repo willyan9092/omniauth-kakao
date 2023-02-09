@@ -13,14 +13,6 @@ module OmniAuth
 
       uid { raw_info['id'].to_s }
 
-      info do
-        {
-          name: raw_properties['nickname'],
-          image: image,
-          email: email
-        }
-      end
-
       extra do
         { raw_info: raw_info }
       end
@@ -31,22 +23,8 @@ module OmniAuth
 
       private
 
-      def email
-        return if raw_kakao_account['email'].nil?
-        return raw_kakao_account['email']
-      end
-
-      def image
-        return if raw_properties['picture'].nil?
-        return raw_properties['picture']
-      end
-
       def raw_info
         @raw_info ||= access_token.get('https://kapi.kakao.com/v2/user/me').parsed
-      end
-
-      def raw_properties
-        @raw_properties ||= raw_info['properties']
       end
 
       def raw_kakao_account
